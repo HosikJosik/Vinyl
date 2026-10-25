@@ -1,0 +1,48 @@
+name: Build VINYL from InterTune
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+permissions:
+  contents: read
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Get VINYL patch
+        uses: actions/checkout@v4
+        with:
+          path: vinyl-patch
+      - name: Get InterTune source and required native submodules
+        uses: actions/checkout@v4
+        with:
+          repository: ItzSkyeYT/InterTune
+          ref: visionos-fix
+          submodules: recursive
+          path: InterTune
+      - name: Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install build requirements from InterTune README
+        run: |
+          sdkmanager --install 'platforms;android-36' 'ndk;29.0.13113456' 'cmake;3.31.6'
+      - name: Check upstream structure
+        run: python3 vinyl-patch/apply_vinyl.py InterTune --check
+      - name: Apply VINYL artwork patch
+        run: python3 vinyl-patch/apply_vinyl.py InterTune
+      - name: Build APK
+        working-directory: InterTune
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon --stacktrace assembleCoreDebug
+      - name: Upload installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: VINYL-InterTune-debug-APK
+          path: InterTune/app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
